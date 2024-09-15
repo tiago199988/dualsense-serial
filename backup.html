@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DS5 Controller Info</title>
+</head>
+<body>
+    <h1>Get Dualsense Controller Info</h1>
+    <button id="connect">Connect to controller</button>
+    <p id="status">Status: Not connected</p>
+    <p id="boardModel">Board Model: N/A</p>
+    <p id="serialNumber">Serial Number: N/A</p>
+    <button id="copySerial" style="display:none;">Copy Serial to Clipboard</button>
+
+    <script>
+        let device;
+        let serialNumber = "";
+
+        // connect to DS5 controller
+        async function connectToDS5() {
+            try {
+                const devices = await navigator.hid.requestDevice({ filters: [{ vendorId: 0x054C }] }); // Vendor ID
+                if (devices.length === 0) {
+                    console.log("No DS5 controller found.");
+                    return;
+                }
+
+                device = devices[0];
+                await device.open();
+                document.getElementById('status').innerText = "Status: Connected";
+
+                
+                ds5_board_model();
+
+                
+                ds5_serial_number();
+
+            } catch (error) {
+                console.error("Failed to connect to DS5:", error);
+                document.getElementById('status').innerText = "Status: Connection failed";
+            }
+        }
+
+        
+        async function ds5_board_model() {
+            try {
+                if (!device) {
+                    console.log("Device is not connected.");
+                    return;
+                }
+
+                const report = await device.receiveFeatureReport(0x20, 64); 
+
+                var cmd = report.getUint8(0);
+                if (cmd !== 0x20 || report.buffer.byteLength !== 64) {
+                    console.log("Invalid report");
+                    return;
+                }
+
+                var hwinfo = report.getUint32(24, true);
+                var boardModel = ds5_hw_to_bm(hwinfo);
+
+                document.getElementById('boardModel').innerText = "Board Model: " + boardModel;
+                
+            } catch (error) {
+                console.error("Error fetching board model:", error);
+                document.getElementById('boardModel').innerText = "Board Model: Error fetching";
+            }
+        }
+
+        function ds5_hw_to_bm(hw_ver) {
+            var a = (hw_ver >> 8) & 0xff;
+
+            if (a === 0x03) {
+                return "BDM-010";
+            } else if (a === 0x04) {
+                return "BDM-020";
+            } else if (a === 0x05) {
+                return "BDM-030";
+            } else if (a === 0x06) {
+                return "BDM-040";
+            } else if (a === 0x07 || a === 0x08) {
+                return "BDM-050";
+            } else {
+                return "Unknown";
+            }
+        }
+
+        // Function to fetch and display the serial number
+        async function ds5_serial_number() {
+            try {
+                if (!device) {
+                    console.log("Device is not connected.");
+                    return;
+                }
+
+                
+                const requestPayload = new Uint8Array(64);  
+                requestPayload.set([0x01, 0x13, 0x01]);     
+
+                
+                await device.sendFeatureReport(0x80, requestPayload);  // Report ID 0x80
+
+                
+                const report = await device.receiveFeatureReport(0x81, 63);  
+
+                
+                const serialBytes = new Uint8Array(report.buffer.slice(3, 21)); // Serial in hex
+                
+                
+                serialNumber = '';
+                serialBytes.forEach(byte => {
+                    if (byte >= 32 && byte <= 126) { 
+                        serialNumber += String.fromCharCode(byte);
+                    }
+                });
+
+                document.getElementById('serialNumber').innerText = "Serial Number: " + serialNumber.toUpperCase();
+
+                
+                document.getElementById('copySerial').style.display = 'block';
+            } catch (error) {
+                console.error("Error fetching serial number:", error);
+                document.getElementById('serialNumber').innerText = "Serial Number: Error fetching";
+            }
+        }
+
+        
+        function copySerialToClipboard() {
+            if (serialNumber) {
+                navigator.clipboard.writeText(serialNumber)
+                    .then(() => {
+                        alert("Serial number copied to clipboard!");
+                    })
+                    .catch(err => {
+                        console.error("Failed to copy serial number: ", err);
+                    });
+            }
+        }
+
+        document.getElementById('connect').addEventListener('click', connectToDS5);
+        document.getElementById('copySerial').addEventListener('click', copySerialToClipboard);
+    </script>
+</body>
+</html>
