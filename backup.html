@@ -89,42 +89,64 @@
 
         // Function to fetch and display the serial number
         async function ds5_serial_number() {
-            try {
-                if (!device) {
-                    console.log("Device is not connected.");
-                    return;
-                }
-
-                
-                const requestPayload = new Uint8Array(64);  
-                requestPayload.set([0x01, 0x13, 0x01]);     
-
-                
-                await device.sendFeatureReport(0x80, requestPayload);  // Report ID 0x80
-
-                
-                const report = await device.receiveFeatureReport(0x81, 63);  
-
-                
-                const serialBytes = new Uint8Array(report.buffer.slice(3, 21)); // Serial in hex
-                
-                
-                serialNumber = '';
-                serialBytes.forEach(byte => {
-                    if (byte >= 32 && byte <= 126) { 
-                        serialNumber += String.fromCharCode(byte);
-                    }
-                });
-
-                document.getElementById('serialNumber').innerText = "Serial Number: " + serialNumber.toUpperCase();
-
-                
-                document.getElementById('copySerial').style.display = 'block';
-            } catch (error) {
-                console.error("Error fetching serial number:", error);
-                document.getElementById('serialNumber').innerText = "Serial Number: Error fetching";
-            }
+    try {
+        if (!device) {
+            console.log("Device is not connected.");
+            return;
         }
+
+        // Prepare and send the request payload
+        const requestPayload = new Uint8Array(64);
+        requestPayload.set([0x01, 0x13, 0x01]);  // Set up the request payload
+
+        await device.sendFeatureReport(0x80, requestPayload);  // Send the feature report
+
+        // Log the raw data received from the device to inspect it
+        const report = await device.receiveFeatureReport(0x81, 64);  // Get the feature report
+        console.log("Raw Report Data: ", new Uint8Array(report.buffer));  // Log raw report data for debugging
+
+        // Now slice the relevant bytes from the report (adjust if necessary)
+        const serialBytes = new Uint8Array(report.buffer.slice(4, 24));  // Slice the serial number bytes
+
+        // Convert the sliced bytes into a hex string
+        let serialHex = '';
+        serialBytes.forEach(byte => {
+            serialHex += ('00' + byte.toString(16)).slice(-2);  // Convert to hex and pad
+        });
+
+        console.log("Hexadecimal Serial: ", serialHex);  // Log the hexadecimal serial number
+
+        // Convert the hex string to ASCII (UTF-8)
+        let serialText = hexToUtf8(serialHex);
+
+        // Filter out any non-printable ASCII characters (outside the range 32-126)
+        serialText = serialText.replace(/[^\x20-\x7E]/g, '');
+
+        console.log("Cleaned Decoded Serial Number: ", serialText);  // Log the cleaned serial number
+
+        // Display the serial number in the DOM
+        document.getElementById('serialNumber').innerText = "Serial Number: " + serialText;
+        document.getElementById('copySerial').style.display = 'block';
+
+    } catch (error) {
+        console.error("Error fetching serial number:", error);
+        document.getElementById('serialNumber').innerText = "Serial Number: Error fetching";
+    }
+}
+
+// Helper function to convert hex string to UTF-8 text
+function hexToUtf8(hex) {
+    let result = '';
+    for (let i = 0; i < hex.length; i += 2) {
+        const charCode = parseInt(hex.substr(i, 2), 16);
+        result += String.fromCharCode(charCode);
+    }
+    return result;
+}
+
+
+
+
 
         
         function copySerialToClipboard() {
@@ -144,3 +166,7 @@
     </script>
 </body>
 </html>
+
+<button onclick="window.location.href='https://hardwaretester.com/gamepad'">Go to Gamepad tester</button>
+<button onclick="window.location.href='https://ds.daidr.me/'">Go to a better Gamepad tester</button>
+<button onclick="window.location.href='https://dualshock-tools.github.io/'">Go to calibration website</button>
