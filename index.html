@@ -165,7 +165,7 @@
                     return;
                 }
 
-                const requestPayload = new Uint8Array(64);  
+                const requestPayload = new Uint8Array(63);  
                 requestPayload.set([0x01, 0x13, 0x01]);     
 
                 await device.sendFeatureReport(0x80, requestPayload);  // Report ID 0x80
